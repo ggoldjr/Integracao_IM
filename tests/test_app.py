@@ -6,18 +6,43 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import httpx
 
-from integracao_im.app import SensorReading, calculate_temperature_plus_rpm, create_app
+from integracao_im.app import (
+    SensorBatch,
+    SensorReading,
+    calculate_temperature_plus_rpm,
+    create_app,
+    preparar_dados,
+)
 
 
 class ApiTests(unittest.IsolatedAsyncioTestCase):
-    sample_payload = {
-        "rpm": 61.0928882027,
-        "wind_speed": 14.8490478216,
-        "current": 12.2994975525,
-        "temperature": 53.8296539588,
-        "vibration": 1.0957122047,
-        "time_days": 0,
-    }
+    sample_records = [
+        {
+            "rpm": 59.972562,
+            "wind_speed": 24.520905,
+            "current": 12.901479,
+            "temperature": 57.242364,
+            "vibration": 1.1922,
+            "time_days": 1318240,
+        },
+        {
+            "rpm": 62.481234,
+            "wind_speed": 22.310456,
+            "current": 13.452789,
+            "temperature": 58.112345,
+            "vibration": 1.2543,
+            "time_days": 1018240,
+        },
+        {
+            "rpm": 58.762341,
+            "wind_speed": 25.678912,
+            "current": 12.54321,
+            "temperature": 56.987654,
+            "vibration": 1.1789,
+            "time_days": 1218230,
+        },
+    ]
+    sample_payload = {"registros": sample_records}
 
     async def request(self, method: str, path: str, **kwargs) -> httpx.Response:
         app = create_app()
@@ -41,21 +66,49 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["valid"])
         self.assertEqual(response.json()["message"], "JSON attributes are valid")
-        self.assertEqual(response.json()["data"], self.sample_payload)
-        self.assertAlmostEqual(response.json()["temperature_plus_rpm"], 114.9225421615)
+        prepared_records = response.json()["data"]["registros"]
+        self.assertEqual(
+            [record["time_days"] for record in prepared_records],
+            [15.257407, 11.785185, 14.099884],
+        )
+        self.assertEqual(len(response.json()["temperature_plus_rpm"]), 3)
+        expected_results = [117.214926, 120.593579, 115.749995]
+        for actual, expected in zip(
+            response.json()["temperature_plus_rpm"],
+            expected_results,
+            strict=True,
+        ):
+            self.assertAlmostEqual(actual, expected)
 
     def test_temperature_plus_rpm_calculation(self) -> None:
-        reading = SensorReading.model_validate(self.sample_payload)
+        reading = SensorReading.model_validate(self.sample_records[0])
 
         result = calculate_temperature_plus_rpm(reading)
 
-        self.assertAlmostEqual(result, 114.9225421615)
+        self.assertAlmostEqual(result, 117.214926)
+
+    def test_preparar_dados_converts_seconds_to_days(self) -> None:
+        payload = SensorBatch.model_validate(
+            {
+                "registros": [
+                    {**self.sample_records[0], "time_days": 18_000},
+                    {**self.sample_records[1], "time_days": 21_600},
+                ]
+            }
+        )
+
+        result = preparar_dados(payload)
+
+        self.assertEqual(
+            [record.time_days for record in result.registros],
+            [0.208333, 0.25],
+        )
 
     async def test_missing_attribute_is_invalid(self) -> None:
         response = await self.request(
             "POST",
             "/api/v1/integrations/im_integration",
-            json={"rpm": 61.09},
+            json={"registros": [{"rpm": 61.09}]},
         )
 
         self.assertEqual(response.status_code, 422)
@@ -63,7 +116,9 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.json()["message"], "JSON attributes are invalid")
 
     async def test_unknown_attribute_is_invalid(self) -> None:
-        payload = {**self.sample_payload, "unknown": 123}
+        payload = {
+            "registros": [{**self.sample_records[0], "unknown": 123}],
+        }
 
         response = await self.request(
             "POST",
@@ -75,12 +130,38 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(response.json()["valid"])
 
     async def test_wrong_attribute_type_is_invalid(self) -> None:
-        payload = {**self.sample_payload, "rpm": "not-a-number"}
+        payload = {
+            "registros": [{**self.sample_records[0], "rpm": "not-a-number"}],
+        }
 
         response = await self.request(
             "POST",
             "/api/v1/integrations/im_integration",
             json=payload,
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["valid"])
+
+    async def test_decimal_timestamp_is_invalid(self) -> None:
+        payload = {
+            "registros": [{**self.sample_records[0], "time_days": 0.208333}],
+        }
+
+        response = await self.request(
+            "POST",
+            "/api/v1/integrations/im_integration",
+            json=payload,
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["valid"])
+
+    async def test_empty_records_list_is_invalid(self) -> None:
+        response = await self.request(
+            "POST",
+            "/api/v1/integrations/im_integration",
+            json={"registros": []},
         )
 
         self.assertEqual(response.status_code, 422)

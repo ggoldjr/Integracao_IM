@@ -1,10 +1,16 @@
 # Integracao IM REST Service
 
-This service validates JSON containing IM sensor measurements. It does not call
-an external application. Valid JSON returns HTTP 200 with `valid: true`; invalid
-JSON returns HTTP 422 with `valid: false` and details about the incorrect fields.
-After validation, the service calculates `temperature + rpm` and includes the
-result in the successful response.
+This service validates a `registros` list containing IM sensor measurements. It
+does not call an external application. Valid JSON returns HTTP 200 with
+`valid: true`; invalid JSON returns HTTP 422 with `valid: false` and details
+about the incorrect fields. After validation, the service calculates
+`time_days / 86,400`, rounded to six decimal places, and updates `time_days` in
+every record. It then calculates `temperature + rpm` for every record and
+returns the results in input order.
+
+The incoming `time_days` must be an integer timestamp in seconds (Python
+`int`, equivalent to Java `long`). The prepared response contains the converted
+floating-point value in days.
 
 ## Setup
 
@@ -28,13 +34,25 @@ Send JSON to the integration endpoint:
 
 ```powershell
 $body = @{
-  rpm = 61.0928882027
-  wind_speed = 14.8490478216
-  current = 12.2994975525
-  temperature = 53.8296539588
-  vibration = 1.0957122047
-  time_days = 0
-} | ConvertTo-Json
+  registros = @(
+    @{
+      rpm = 59.972562
+      wind_speed = 24.520905
+      current = 12.901479
+      temperature = 57.242364
+      vibration = 1.1922
+      time_days = 1318240
+    },
+    @{
+      rpm = 62.481234
+      wind_speed = 22.310456
+      current = 13.452789
+      temperature = 58.112345
+      vibration = 1.2543
+      time_days = 1018240
+    }
+  )
+} | ConvertTo-Json -Depth 4
 Invoke-RestMethod `
   -Method Post `
   -Uri http://127.0.0.1:8000/api/v1/integrations/im_integration `
@@ -49,14 +67,26 @@ A successful response looks like:
   "valid": true,
   "message": "JSON attributes are valid",
   "data": {
-    "rpm": 61.0928882027,
-    "wind_speed": 14.8490478216,
-    "current": 12.2994975525,
-    "temperature": 53.8296539588,
-    "vibration": 1.0957122047,
-    "time_days": 0.0
+    "registros": [
+      {
+        "rpm": 59.972562,
+        "wind_speed": 24.520905,
+        "current": 12.901479,
+        "temperature": 57.242364,
+        "vibration": 1.1922,
+        "time_days": 15.257407
+      },
+      {
+        "rpm": 62.481234,
+        "wind_speed": 22.310456,
+        "current": 13.452789,
+        "temperature": 58.112345,
+        "vibration": 1.2543,
+        "time_days": 11.785185
+      }
+    ]
   },
-  "temperature_plus_rpm": 114.9225421615
+  "temperature_plus_rpm": [117.214926, 120.593579]
 }
 ```
 
