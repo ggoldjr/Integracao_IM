@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "integracao-im"
-version = "0.1.0"
+version = "0.3.0"
 description = "REST service that validates IM sensor JSON messages."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,9 @@ dependencies = [
   "fastapi>=0.116,<1.0",
   "joblib>=1.5,<2.0",
   "pandas>=2.3,<4.0",
+  "scikit-learn>=1.7,<2.0",
   "uvicorn[standard]>=0.35,<1.0",
+  "xgboost>=3.0,<4.0",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +25,9 @@ integracao-im = "integracao_im.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+integracao_im = ["pkls/*.pkl"]
 
 [tool.ruff]
 line-length = 100

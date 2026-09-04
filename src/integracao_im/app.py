@@ -1,5 +1,10 @@
 import os
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Literal
 
+import joblib
+import pandas as pd
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -8,6 +13,15 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 SECONDS_PER_DAY = 86_400
+MODEL_FEATURES = [
+    "rpm",
+    "wind_speed",
+    "current",
+    "temperature",
+    "vibration",
+    "time_days",
+]
+MODEL_DIR = Path(__file__).resolve().parent / "pkls"
 
 
 class SensorReading(BaseModel):
@@ -78,17 +92,45 @@ class PreparedSensorBatch(BaseModel):
     registros: list[PreparedSensorReading]
 
 
+class RulClassificationMessage(BaseModel):
+    resultado: Literal["sucesso"]
+    situac: list[str]
+    rul: list[float]
+
+
 class ValidationResponse(BaseModel):
     valid: bool
     message: str
     data: PreparedSensorBatch
-    temperature_plus_rpm: list[float]
+    mesg_resposta: RulClassificationMessage
 
 
-def calculate_temperature_plus_rpm(
-    reading: SensorReading | PreparedSensorReading,
-) -> float:
-    return reading.temperature + reading.rpm
+@lru_cache(maxsize=1)
+def carregar_modelos() -> tuple[Any, Any, Any]:
+    model_xgb_reg = joblib.load(MODEL_DIR / "model_xgb_reg.pkl")
+    model_xgb_cls = joblib.load(MODEL_DIR / "model_xgb_cls.pkl")
+    label_encoder = joblib.load(MODEL_DIR / "label_encoder.pkl")
+    return model_xgb_reg, model_xgb_cls, label_encoder
+
+
+def rul_classificacao(payload: PreparedSensorBatch) -> RulClassificationMessage:
+    frame = pd.DataFrame(
+        [reading.model_dump() for reading in payload.registros],
+        columns=MODEL_FEATURES,
+    )
+    model_xgb_reg, model_xgb_cls, label_encoder = carregar_modelos()
+
+    resp_data_rul = [round(float(value), 2) for value in model_xgb_reg.predict(frame)]
+    coded_classification = model_xgb_cls.predict(frame).astype(int)
+    resp_form = [
+        str(value) for value in label_encoder.inverse_transform(coded_classification)
+    ]
+
+    return RulClassificationMessage(
+        resultado="sucesso",
+        situac=resp_form,
+        rul=resp_data_rul,
+    )
 
 
 def preparar_dados(payload: SensorBatch) -> PreparedSensorBatch:
@@ -106,7 +148,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="Integracao IM",
         description="Validates JSON containing IM sensor measurements.",
-        version="0.2.0",
+        version="0.3.0",
     )
 
     @application.exception_handler(RequestValidationError)
@@ -134,15 +176,13 @@ def create_app() -> FastAPI:
     )
     async def validate_sensor_reading(payload: SensorBatch) -> ValidationResponse:
         prepared_payload = preparar_dados(payload)
-        temperature_plus_rpm = [
-            calculate_temperature_plus_rpm(reading) for reading in prepared_payload.registros
-        ]
+        mesg_resposta = rul_classificacao(prepared_payload)
 
         return ValidationResponse(
             valid=True,
             message="JSON attributes are valid",
             data=prepared_payload,
-            temperature_plus_rpm=temperature_plus_rpm,
+            mesg_resposta=mesg_resposta,
         )
 
     return application

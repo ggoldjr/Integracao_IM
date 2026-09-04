@@ -5,8 +5,7 @@ does not call an external application. Valid JSON returns HTTP 200 with
 `valid: true`; invalid JSON returns HTTP 422 with `valid: false` and details
 about the incorrect fields. After validation, the service calculates
 `time_days / 86,400`, rounded to six decimal places, and updates `time_days` in
-every record. It then calculates `temperature + rpm` for every record and
-returns the results in input order.
+every record. It then runs the XGBoost classification and RUL regression models.
 
 The incoming `time_days` must be an integer timestamp in seconds (Python
 `int`, equivalent to Java `long`). The prepared response contains the converted
@@ -86,9 +85,19 @@ A successful response looks like:
       }
     ]
   },
-  "temperature_plus_rpm": [117.214926, 120.593579]
+  "mesg_resposta": {
+    "resultado": "sucesso",
+    "situac": ["SAUDÁVEL", "SAUDÁVEL"],
+    "rul": [257.67, 264.06]
+  }
 }
 ```
+
+The model artifacts are packaged from `src/integracao_im/pkls`:
+
+- `model_xgb_reg.pkl`
+- `model_xgb_cls.pkl`
+- `label_encoder.pkl`
 
 ## Test
 

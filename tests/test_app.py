@@ -8,10 +8,9 @@ import httpx
 
 from integracao_im.app import (
     SensorBatch,
-    SensorReading,
-    calculate_temperature_plus_rpm,
     create_app,
     preparar_dados,
+    rul_classificacao,
 )
 
 
@@ -71,21 +70,24 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             [record["time_days"] for record in prepared_records],
             [15.257407, 11.785185, 14.099884],
         )
-        self.assertEqual(len(response.json()["temperature_plus_rpm"]), 3)
-        expected_results = [117.214926, 120.593579, 115.749995]
-        for actual, expected in zip(
-            response.json()["temperature_plus_rpm"],
-            expected_results,
-            strict=True,
-        ):
-            self.assertAlmostEqual(actual, expected)
+        self.assertEqual(
+            response.json()["mesg_resposta"],
+            {
+                "resultado": "sucesso",
+                "situac": ["SAUDÁVEL", "SAUDÁVEL", "SAUDÁVEL"],
+                "rul": [257.67, 264.06, 260.89],
+            },
+        )
 
-    def test_temperature_plus_rpm_calculation(self) -> None:
-        reading = SensorReading.model_validate(self.sample_records[0])
+    def test_rul_classificacao(self) -> None:
+        payload = SensorBatch.model_validate(self.sample_payload)
+        prepared_payload = preparar_dados(payload)
 
-        result = calculate_temperature_plus_rpm(reading)
+        result = rul_classificacao(prepared_payload)
 
-        self.assertAlmostEqual(result, 117.214926)
+        self.assertEqual(result.resultado, "sucesso")
+        self.assertEqual(result.situac, ["SAUDÁVEL", "SAUDÁVEL", "SAUDÁVEL"])
+        self.assertEqual(result.rul, [257.67, 264.06, 260.89])
 
     def test_preparar_dados_converts_seconds_to_days(self) -> None:
         payload = SensorBatch.model_validate(
