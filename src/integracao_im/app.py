@@ -192,6 +192,6 @@ app = create_app()
 
 
 def main() -> None:
-    host = os.getenv("SERVICE_HOST", "127.0.0.1")
+    host = os.getenv("SERVICE_HOST", "0.0.0.0")
     port = int(os.getenv("SERVICE_PORT", "8181"))
     uvicorn.run("integracao_im.app:app", host=host, port=port, reload=False)

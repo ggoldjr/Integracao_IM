@@ -24,10 +24,14 @@ python -m pip install -e ".[dev]"
 integracao-im
 ```
 
+By default, the service binds to `0.0.0.0:8181` so it can receive connections
+from other servers. Remote clients must use this server's IP address or DNS
+name, not `0.0.0.0`.
+
 Open these URLs after the server starts:
 
-- API documentation: http://127.0.0.1:8181/docs
-- Health check: http://127.0.0.1:8181/health
+- API documentation: http://0.0.0.0:8181/docs
+- Health check: http://0.0.0.0:8181/health
 
 Send JSON to the integration endpoint:
 
@@ -54,7 +58,7 @@ $body = @{
 } | ConvertTo-Json -Depth 4
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8181/api/v1/integrations/im_integration `
+  -Uri http://0.0.0.0:8181/api/v1/integrations/im_integration `
   -ContentType "application/json" `
   -Body $body
 ```

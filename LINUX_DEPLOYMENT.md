@@ -81,7 +81,7 @@ SERVICE_HOST=0.0.0.0 SERVICE_PORT=8181 .venv/bin/integracao-im
 From another terminal on the server:
 
 ```bash
-curl http://127.0.0.1:8181/health
+curl http://0.0.0.0:8181/health
 ```
 
 Expected response:
@@ -172,7 +172,7 @@ Send a valid request from the Linux server:
 
 ```bash
 curl --request POST \
-  --url http://127.0.0.1:8181/api/v1/integrations/im_integration \
+  --url http://0.0.0.0:8181/api/v1/integrations/im_integration \
   --header 'Content-Type: application/json' \
   --data '{
     "registros": [
@@ -227,4 +227,3 @@ The application wheel is platform-independent, but dependencies such as
 Pandas, SciPy, scikit-learn, and XGBoost have platform-specific binaries. For
 an offline deployment, create the dependency wheelhouse on a Linux system with
 the same CPU architecture and compatible Linux version as the target server.
-
