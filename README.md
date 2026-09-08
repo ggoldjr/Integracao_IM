@@ -26,8 +26,8 @@ integracao-im
 
 Open these URLs after the server starts:
 
-- API documentation: http://127.0.0.1:8000/docs
-- Health check: http://127.0.0.1:8000/health
+- API documentation: http://127.0.0.1:8181/docs
+- Health check: http://127.0.0.1:8181/health
 
 Send JSON to the integration endpoint:
 
@@ -54,7 +54,7 @@ $body = @{
 } | ConvertTo-Json -Depth 4
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://127.0.0.1:8000/api/v1/integrations/im_integration `
+  -Uri http://127.0.0.1:8181/api/v1/integrations/im_integration `
   -ContentType "application/json" `
   -Body $body
 ```
@@ -107,3 +107,8 @@ python -m unittest discover -s tests -v
 
 When VS Code opens this folder, install the recommended extensions and select
 `.venv\Scripts\python.exe` if the interpreter is not selected automatically.
+
+## Linux deployment
+
+See [LINUX_DEPLOYMENT.md](LINUX_DEPLOYMENT.md) for installation, systemd,
+network, verification, update, and wheel deployment instructions.
