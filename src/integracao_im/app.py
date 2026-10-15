@@ -122,9 +122,7 @@ def rul_classificacao(payload: PreparedSensorBatch) -> RulClassificationMessage:
 
     resp_data_rul = [round(float(value), 2) for value in model_xgb_reg.predict(frame)]
     coded_classification = model_xgb_cls.predict(frame).astype(int)
-    resp_form = [
-        str(value) for value in label_encoder.inverse_transform(coded_classification)
-    ]
+    resp_form = [str(value) for value in label_encoder.inverse_transform(coded_classification)]
 
     return RulClassificationMessage(
         resultado="sucesso",
