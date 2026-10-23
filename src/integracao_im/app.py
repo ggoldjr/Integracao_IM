@@ -113,6 +113,24 @@ def carregar_modelos() -> tuple[Any, Any, Any]:
     return model_xgb_reg, model_xgb_cls, label_encoder
 
 
+# def rul_classificacao(payload: PreparedSensorBatch) -> RulClassificationMessage:
+#     frame = pd.DataFrame(
+#         [reading.model_dump() for reading in payload.registros],
+#         columns=MODEL_FEATURES,
+#     )
+#     model_xgb_reg, model_xgb_cls, label_encoder = carregar_modelos()
+
+#     resp_data_rul = [round(float(value), 2) for value in model_xgb_reg.predict(frame)]
+#     coded_classification = model_xgb_cls.predict(frame).astype(int)
+#     resp_form = [str(value) for value in label_encoder.inverse_transform(coded_classification)]
+
+#     return RulClassificationMessage(
+#         resultado="sucesso",
+#         situac=resp_form,
+#         rul=resp_data_rul,
+#     )
+
+
 def rul_classificacao(payload: PreparedSensorBatch) -> RulClassificationMessage:
     frame = pd.DataFrame(
         [reading.model_dump() for reading in payload.registros],
@@ -122,7 +140,19 @@ def rul_classificacao(payload: PreparedSensorBatch) -> RulClassificationMessage:
 
     resp_data_rul = [round(float(value), 2) for value in model_xgb_reg.predict(frame)]
     coded_classification = model_xgb_cls.predict(frame).astype(int)
-    resp_form = [str(value) for value in label_encoder.inverse_transform(coded_classification)]
+
+    # resp_form = [
+    #     str(value) for value in label_encoder.inverse_transform(coded_classification)
+    # ]
+    # Probabilidade da classe prevista (%)
+    probabilidades = model_xgb_cls.predict_proba(frame)
+
+    resp_form = [
+        f"{classe} ({prob * 100:.3f}%)"
+        for classe, prob in zip(
+            label_encoder.inverse_transform(coded_classification), probabilidades.max(axis=1)
+        )
+    ]
 
     return RulClassificationMessage(
         resultado="sucesso",
